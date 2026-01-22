@@ -1,0 +1,186 @@
+# daily-workout
+每日训练盲盒
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProFit 智能健身私教</title>
+    <style>
+        :root { --primary: #00dfa2; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { font-family: 'PingFang SC', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+        .page { display: none; max-width: 500px; margin: 0 auto; animation: fadeIn 0.4s; }
+        .active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .card { background: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1 { font-size: 1.5rem; text-align: center; color: var(--primary); margin-bottom: 2rem; }
+        label { display: block; margin-bottom: 8px; font-size: 0.9rem; color: #94a3b8; }
+        select, input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
+        
+        .btn-main { width: 100%; padding: 15px; background: var(--primary); color: #000; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
+        .ex-item { background: #334155; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .input-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .rest-timer { text-align: center; color: var(--primary); font-size: 1.2rem; font-weight: bold; margin: 15px 0; }
+        .summary-box { background: var(--primary); color: #000; padding: 20px; border-radius: 12px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="setup" class="page active">
+    <h1>🏋️ ProFit 配置</h1>
+    <div class="card">
+        <label>你的性别</label>
+        <select id="gender">
+            <option value="m">男士 (侧重力量与围度)</option>
+            <option value="f">女士 (侧重线条与塑形)</option>
+        </select>
+
+        <label>训练环境</label>
+        <select id="env">
+            <option value="gym">健身房训练 (全套器械)</option>
+            <option value="home">居家训练 (哑铃/弹力带/自重)</option>
+        </select>
+
+        <label>进阶程度</label>
+        <select id="level">
+            <option value="0">新手小白 (基础动作为主)</option>
+            <option value="1">有训练基础 (中等强度)</option>
+            <option value="2">高手进阶 (高难度/大重量)</option>
+        </select>
+
+        <label>今日目标部位</label>
+        <select id="target">
+            <option value="chest">胸部训练 (Chest)</option>
+            <option value="back">背部训练 (Back)</option>
+            <option value="legs">腿部训练 (Legs)</option>
+            <option value="shoulders">肩部训练 (Shoulders)</option>
+            <option value="arms">手臂训练 (Arms)</option>
+            <option value="core">核心力量 (Core)</option>
+            <option value="func">功能性训练 (Functional)</option>
+        </select>
+        <button class="btn-main" onclick="generateWorkout()">生成专属方案</button>
+    </div>
+</div>
+
+<div id="workout" class="page">
+    <h1 id="workoutTitle">正在训练</h1>
+    <div id="list"></div>
+    <div class="rest-timer" id="timerDisplay">休息时间: --</div>
+    <button class="btn-main" onclick="finish()">结束训练查看报告</button>
+</div>
+
+<div id="report" class="page">
+    <h1>🏆 训练总结</h1>
+    <div id="summaryContent"></div>
+    <button class="btn-main" style="margin-top:20px" onclick="location.reload()">存为图片并返回</button>
+</div>
+
+<script>
+// 每个部位补全 20+ 动作，区分居家(H)和健身房(G)
+const db = {
+    chest: {
+        gym: ["杠铃平板卧推", "哑铃上斜卧推", "蝴蝶机夹胸", "绳索下斜夹胸", "史密斯推胸", "双杠臂屈伸", "器械坐姿推胸", "哑铃平卧飞鸟", "上斜杠铃卧推", "下斜哑铃卧推", "切分卧推", "窄距卧推", "地雷管推胸", "对掌哑铃卧推", "悍马机推胸", "绳索高位下拉夹胸", "药球俯卧撑", "加重双杠", "等长收缩压盘", "史密斯上斜推"],
+        home: ["标准俯卧撑", "宽距俯卧撑", "钻石俯卧撑", "下斜俯卧撑", "上斜俯卧撑", "哑铃地卧推", "哑铃地板飞鸟", "弹力带推胸", "弹力带夹胸", "释手俯卧撑", "侧重俯卧撑", "哑铃对掌推", "斯万推胸", "核心板俯卧撑", "单臂弹力带推", "跪姿俯卧撑", "慢速控制俯卧撑", "等距静力支撑", "哑铃前推", "波比跳"]
+    },
+    back: {
+        gym: ["高位下拉", "引体向上", "杠铃划船", "坐姿划船", "单臂哑铃划船", "T杠划船", "直臂下拉", "硬拉", "山羊挺身", "器械划船", "悍马机下拉", "史密斯划船", "反向飞鸟", "地雷管划船", "窄距下拉", "对角线下拉", "助力引体向上", "负重引体向上", "绳索面拉", "耸肩"],
+        home: ["自重划船", "门框引体", "哑铃屈体划船", "单臂哑铃划船", "超人起身后收", "毛巾下拉", "弹力带划船", "弹力带直臂下拉", "俯身Y字举", "俯身W字举", "俯身T字举", "哑铃硬拉", "猫式伸展", "单臂弹力带划船", "俯身爬行", "靠墙静蹲下拉", "地板划船", "哑铃反向飞鸟", "水瓶划船", "俯身游泳式"]
+    },
+    legs: {
+        gym: ["杠铃深蹲", "腿举机", "保加利亚分腿蹲", "坐姿腿屈伸", "俯卧腿弯举", "哑铃箭步蹲", "相扑深蹲", "史密斯深蹲", "哈克深蹲", "提踵", "直腿硬拉", "早安式", "坐姿腿外展", "坐姿腿内收", "器械单腿蹲", "负重臀桥", "雪橇车推行", "跳箱训练", "六角杠硬拉", "侧步蹲"],
+        home: ["徒手深蹲", "哑铃杯式深蹲", "箭步蹲", "保加利亚分腿蹲", "臀桥", "单腿硬拉", "侧卧腿外展", "跪姿后踢腿", "深蹲跳", "波比跳", "墙壁静蹲", "提踵", "侧箭步蹲", "溜冰者跳", "哑铃深蹲", "单腿臀桥", "鸭子步", "跪姿侧抬腿", "自重分腿蹲", "毛巾腿弯举"]
+    },
+    shoulders: {
+        gym: ["杠铃过顶推举", "哑铃坐姿推举", "哑铃侧平举", "杠铃直立划船", "哑铃前平举", "阿诺德推举", "蝴蝶机后备反向飞鸟", "绳索面拉", "史密斯推举", "地雷管单臂推", "斯科特压肩", "倾斜侧平举", "绳索侧平举", "器械推肩", "耸肩", "六角杠推举", "哑铃围绕世界", "Y字推举", "古巴推举", "杠铃前平举"],
+        home: ["哑铃坐姿推举", "哑铃侧平举", "哑铃前平举", "俯身哑铃飞鸟", "阿诺德推举", "倒立俯卧撑", "弹力带侧平举", "弹力带前平举", "派克俯卧撑", "Y-W字伸展", "哑铃耸肩", "单臂弹力带推举", "水瓶侧平举", "波比跳", "爬壁俯卧撑", "哑铃直立划船", "毛巾面拉", "单臂侧支撑抬臂", "支撑摸肩", "弹力带脸拉"]
+    },
+    arms: {
+        gym: ["杠铃弯举", "哑铃交替弯举", "绳索下压", "碎颅者(仰卧臂屈伸)", "牧师凳弯举", "锤式弯举", "窄距卧推", "双杠臂屈伸", "上斜哑铃弯举", "21响礼炮弯举", "反手绳索下压", "单臂绳索弯举", "斜板托臂弯举", "凳上反屈伸", "过顶绳索臂屈伸", "龙门架高位弯举", "史密斯窄距推", "反手弯举", "赫拉克勒斯弯举", "握力器练习"],
+        home: ["哑铃弯举", "锤式弯举", "凳上反屈伸", "钻石俯卧撑", "哑铃颈后臂屈伸", "弹力带弯举", "弹力带下压", "俯卧撑", "水瓶弯举", "单臂哑铃弯举", "窄距俯卧撑", "毛巾弯举", "反向俯卧撑", "哑铃仰卧臂屈伸", "集中弯举", "支撑转体", "弹力带过顶伸展", "徒手弯举(静力)", "沙发臂屈伸", "交替摸肩"]
+    },
+    core: {
+        gym: ["悬垂举腿", "负重卷腹", "器械转体", "罗马椅侧屈", "龙门架伐木者", "仰卧负重举腿", "健腹轮", "跪姿绳索卷腹", "负重平板支撑", "侧向拉力支撑", "球上卷腹", "球上平板支撑", "器械仰卧起坐", "高位伐木", "低位伐木", "负重俄罗斯转体", "仰卧风车", "绳索核心旋转", "单臂农夫行走", "土耳其起立"],
+        home: ["平板支撑", "卷腹", "俄罗斯转体", "死虫式", "鸟狗式", "仰卧骑行", "仰卧举腿", "侧平板支撑", "登山者", "仰卧起坐", "V字起身", "剪刀脚", "反向卷腹", "摸膝卷腹", "侧卧卷腹", "真空腹练习", "支撑收腹跳", "支撑摸脚", "仰卧摆腿", "雨刮器"]
+    },
+    func: {
+        gym: ["战绳训练", "壶铃摇摆", "翻轮胎", "阻力撬推行", "药球砸地", "拳击沙袋", "跳箱", "农夫行走", "划船机冲刺", "风扇车", "波速球平衡", "土耳其起立", "清洁举", "抓举", "波比跳接引体", "敏捷梯", "负重爬行", "保加利亚能量包旋转", "单腿硬拉", "药球投掷"],
+        home: ["波比跳", "开合跳", "高抬腿", "登山步", "跳绳", "深蹲跳", "影子拳", "熊爬", "波比跳", "溜冰者跳", "哑铃摇摆", "单腿平衡", "跨步跳", "爬行俯卧撑", "侧向滑步", "原地冲刺", "跪姿起立跳", "星星跳", "波比跳(带俯卧撑)", "俯身爬坡"]
+    }
+};
+
+let workoutData = [];
+
+function generateWorkout() {
+    const target = document.getElementById('target').value;
+    const env = document.getElementById('env').value;
+    const pool = [...db[target][env]];
+    
+    workoutData = [];
+    for(let i=0; i<6; i++) {
+        const rand = Math.floor(Math.random() * pool.length);
+        workoutData.push({name: pool.splice(rand, 1)[0], sets: []});
+    }
+
+    const list = document.getElementById('list');
+    list.innerHTML = workoutData.map((ex, i) => `
+        <div class="ex-item">
+            <strong>${i+1}. ${ex.name}</strong>
+            <div class="input-group">
+                <input type="number" id="w_${i}" placeholder="Kg">
+                <input type="number" id="r_${i}" placeholder="次数">
+                <input type="number" id="s_${i}" placeholder="组数">
+            </div>
+            <button onclick="startTimer()" style="margin-top:10px; width:100%; padding:5px; background:#475569; color:white; border:none; border-radius:5px;">开始组间休息</button>
+        </div>
+    `).join('');
+    
+    showPage('workout');
+}
+
+let timer;
+function startTimer() {
+    clearInterval(timer);
+    let sec = 60;
+    timer = setInterval(() => {
+        sec--;
+        document.getElementById('timerDisplay').innerText = `休息时间: ${sec}s`;
+        if(sec <= 0) {
+            clearInterval(timer);
+            document.getElementById('timerDisplay').innerText = "休息结束！";
+            alert("休息结束，开始下一组！");
+        }
+    }, 1000);
+}
+
+function finish() {
+    let totalCap = 0;
+    let log = "";
+    workoutData.forEach((ex, i) => {
+        const w = parseFloat(document.getElementById(`w_${i}`).value) || 0;
+        const r = parseInt(document.getElementById(`r_${i}`).value) || 0;
+        const s = parseInt(document.getElementById(`s_${i}`).value) || 0;
+        const cap = w * r * s;
+        totalCap += cap;
+        if(cap > 0) log += `<p>✅ ${ex.name}: ${w}kg x ${r}次 x ${s}组</p>`;
+    });
+
+    document.getElementById('summaryContent').innerHTML = `
+        <div class="summary-box">
+            <h2>总训练容量: ${totalCap} kg</h2>
+            <p>日期: ${new Date().toLocaleDateString()}</p>
+        </div>
+        <div style="padding:15px; background:#334155; border-radius:12px; margin-top:15px;">
+            ${log || "未记录具体数据"}
+        </div>
+    `;
+    showPage('report');
+}
+
+function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+</script>
+</body>
+</html>
